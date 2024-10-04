@@ -1,0 +1,5 @@
+aiogram==3.13.1
+openai==1.50.0
+djangorestframework
+psycopg2-binary
+python-dotenv==1.0.1
