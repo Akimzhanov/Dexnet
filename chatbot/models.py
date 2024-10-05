@@ -15,6 +15,7 @@ class UserQuery(models.Model):
     query = models.TextField()                  # Запрос пользователя
     response = models.TextField(null=True, blank=True)  # Ответ, если найден
     faq_match = models.ForeignKey(FAQ, null=True, blank=True, on_delete=models.SET_NULL)  # Связанный вопрос FAQ, если найден
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')  # Ссылка на предыдущее сообщение (если есть)
     created_at = models.DateTimeField(auto_now_add=True)
     escalated_to_human = models.BooleanField(default=False)  # Флаг эскалации на человека
 

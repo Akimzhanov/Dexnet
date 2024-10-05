@@ -34,15 +34,24 @@ async def handle_message(message: types.Message):
     user_id = message.from_user.id
     query = message.text
 
+    # Если команда /start, игнорируем сохранение
+    if query == '/start':
+        await message.answer("Привет! Чем могу помочь?")
+        return
+
+    # Получаем предыдущий запрос пользователя, если он есть
+    previous_query = await sync_to_async(UserQuery.objects.filter(user_id=user_id).order_by('-created_at').first)()
+
     # Показываем, что бот "печатает"
     await bot.send_chat_action(message.chat.id, action="typing")
     
     try:
         faq_answer = await search_faq_or_chatgpt(query)  # Используем await для асинхронного вызова
         
-        if faq_answer and faq_answer != '/start':
+        if faq_answer:
             await message.answer(faq_answer)
-            await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=faq_answer)  # Оборачиваем сохранение в БД
+            # Сохраняем новый запрос и связываем с предыдущим
+            await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=faq_answer, parent=previous_query)
         else:
             # Показываем, что бот продолжает "печатать", пока ждет ответ от ChatGPT
             await bot.send_chat_action(message.chat.id, action="typing")
@@ -51,7 +60,8 @@ async def handle_message(message: types.Message):
             chatgpt_answer = await asyncio.wait_for(get_chatgpt_response(query), timeout=15.0)
             
             await message.answer(chatgpt_answer)
-            await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=chatgpt_answer)  # Сохранение результата в БД
+            # Сохраняем новый запрос и связываем с предыдущим
+            await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=chatgpt_answer, parent=previous_query)
             await sync_to_async(FAQLearning.objects.create)(question=query, answer=chatgpt_answer)  # Сохранение для обучения
     
     except asyncio.TimeoutError:
@@ -59,6 +69,7 @@ async def handle_message(message: types.Message):
     except Exception as e:
         logging.error(f"Error while handling message: {e}")
         await message.answer("Произошла ошибка при обработке вашего запроса.")
+
 
 # Регистрация обработчика команды /start
 dp.message.register(handle_message, Command(commands=["start"]))
@@ -77,7 +88,7 @@ async def get_chatgpt_response(query):
                 {"role": "system", "content": "Ты — полезный ассистент, отвечай всегда на русском языке."},  # Указываем, что бот должен отвечать на русском
                 {"role": "user", "content": query}
             ],
-            max_tokens=150
+            # max_tokens=150
         )
         return response.choices[0].message.content
     except Exception as e:
