@@ -84,12 +84,7 @@ async def handle_message(message: types.Message, state: FSMContext):
                     # Сохраняем список схожих вопросов как словарь и активируем состояние ожидания выбора
                     await state.update_data(faq_options=faq_options)
                     await state.set_state(FAQStates.awaiting_clarification)
-                # else:
-                    # # Если найден только один похожий вопрос, отвечаем сразу
-                    # faq_answer = similar_faqs[0].answer
-                    # await message.answer(faq_answer)
-                    # # Сохраняем новый запрос и связываем с предыдущим
-                    # await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=faq_answer)
+
             else:
                 # Если похожих вопросов нет, отправляем запрос к ChatGPT
                 old_query = await state.get_data()
@@ -112,7 +107,6 @@ async def handle_message(message: types.Message, state: FSMContext):
                     # Сохраняем новый запрос и связываем с предыдущим
                     await sync_to_async(UserQuery.objects.create)(user_id=user_id, query=query, response=chatgpt_answer)
                     await sync_to_async(FAQLearning.objects.create)(question=query, answer=chatgpt_answer)
-                    print(f'44444444444444444444444444444444444444{e}')
     
     except asyncio.TimeoutError:
         await message.answer("Произошла задержка при получении ответа. Пожалуйста, попробуйте позже.")
@@ -128,16 +122,17 @@ dp.message.register(handle_message)
 
 # Логика запроса к ChatGPT
 client = AsyncOpenAI(api_key=os.environ['CHAT_GPT_API_KEY'])
+assistant_id = 'asst_mVT6S4byZqWNC84sJGdda8D0'
 
 async def get_chatgpt_response(query):
     try:
         response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Ты — полезный ассистент, отвечай всегда на русском языке."},
-                {"role": "user", "content": query}
+                {"role": "system","content": "GPT должен отвечать только на те вопросы которые связаны с компанией Dexfreedom,Dexnet.one,Dexsafe,Dexcard,DexMobile,Dexnoda, ты должен отвечать как консультант и искать максимально похожие вопросы у себя на базе и задавать уточняющие вопросы . Все сторонние вопросы не должен отвечать ничего кроме Я не могу ответить на вопрос"},
+                {"role": "assistant", "content": query}
             ],
-            max_tokens=150
+            # max_tokens=150
         )
         return response.choices[0].message.content
     except Exception as e:
